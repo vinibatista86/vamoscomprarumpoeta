@@ -1,0 +1,1032 @@
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Leitor - Manuscrito Moderno 2.0</title>
+
+<style>
+body{
+margin:0;
+font-family:Georgia,serif;
+background:#f5f1e8;
+color:#1e1e1e;
+}
+
+#toolbar{
+position:sticky;
+top:0;
+z-index:30;
+background:#fffdf8;
+border-bottom:1px solid #ddd;
+padding:12px 20px;
+display:flex;
+flex-wrap:wrap;
+align-items:center;
+gap:14px;
+box-shadow:0 2px 12px rgba(0,0,0,.06);
+font-family:system-ui,sans-serif;
+font-size:14px;
+}
+
+#toolbar label{font-weight:600;}
+#userName{
+padding:8px 12px;
+border:1px solid #ccc;
+border-radius:8px;
+min-width:180px;
+font-size:14px;
+}
+
+.palette{
+display:flex;
+align-items:center;
+gap:8px;
+}
+
+.palette span{font-weight:600;margin-right:4px;}
+
+.swatch{
+width:28px;
+height:28px;
+border-radius:50%;
+border:2px solid transparent;
+cursor:pointer;
+box-shadow:inset 0 0 0 1px rgba(0,0,0,.12);
+}
+
+.swatch.active{
+border-color:#1e1e1e;
+transform:scale(1.08);
+}
+
+.toolbar-actions{
+display:flex;
+flex-wrap:wrap;
+gap:8px;
+margin-left:auto;
+}
+
+.toolbar-actions button{
+width:auto;
+margin:0;
+padding:8px 14px;
+border:1px solid #ccc;
+border-radius:8px;
+background:#fff;
+cursor:pointer;
+font-size:13px;
+}
+
+.toolbar-actions button.primary{
+background:#1f2933;
+color:#fff;
+border-color:#1f2933;
+}
+
+.toolbar-actions button:hover{background:#f0f0f0;}
+.toolbar-actions button.primary:hover{background:#374151;}
+
+#wrap{display:flex;width:100%;}
+.side{width:260px;min-height:calc(100vh - 60px);}
+
+#center{
+flex:1;
+display:flex;
+justify-content:center;
+padding:40px;
+}
+
+#text{
+width:740px;
+max-width:100%;
+background:#fffdf8;
+padding:60px;
+line-height:1.9;
+font-size:18px;
+box-shadow:0 10px 30px rgba(0,0,0,.08);
+}
+
+#text p{
+margin:0 0 1em;
+}
+
+#text p.cena{
+text-align:center;
+letter-spacing:.35em;
+color:#666;
+margin:2em 0;
+}
+
+.highlight{
+padding:2px;
+border-radius:2px;
+}
+
+.note{
+position:absolute;
+width:220px;
+background:#1f2933;
+color:white;
+padding:12px 12px 12px 12px;
+padding-top:36px;
+border-radius:10px;
+z-index:10;
+cursor:grab;
+box-shadow:0 8px 20px rgba(0,0,0,.2);
+}
+
+.note-edit{
+position:absolute;
+top:8px;
+right:8px;
+width:28px;
+height:28px;
+padding:0;
+margin:0;
+border:none;
+border-radius:6px;
+background:rgba(255,255,255,.15);
+color:#fff;
+cursor:pointer;
+font-size:14px;
+line-height:1;
+}
+
+.note-edit:hover{background:rgba(255,255,255,.3);}
+
+.note-body{white-space:pre-wrap;word-break:break-word;}
+
+#svg{
+position:absolute;
+top:0;
+left:0;
+width:100%;
+pointer-events:none;
+z-index:5;
+}
+
+#modal{
+position:fixed;
+inset:0;
+display:none;
+justify-content:center;
+align-items:center;
+background:rgba(0,0,0,.4);
+z-index:40;
+}
+
+#box{
+width:360px;
+padding:20px;
+border-radius:12px;
+background:white;
+font-family:system-ui,sans-serif;
+}
+
+#box h3{margin-top:0;}
+
+#box textarea{
+width:100%;
+height:100px;
+box-sizing:border-box;
+padding:8px;
+border:1px solid #ccc;
+border-radius:8px;
+font-family:inherit;
+}
+
+#box .modal-actions{
+display:flex;
+flex-direction:column;
+gap:8px;
+margin-top:12px;
+}
+
+#box button{
+padding:10px;
+width:100%;
+border-radius:8px;
+border:1px solid #ccc;
+background:#fff;
+cursor:pointer;
+}
+
+#box button.primary{background:#1f2933;color:#fff;border-color:#1f2933;}
+#box button.danger{background:#b91c1c;color:#fff;border-color:#b91c1c;}
+
+#edit-choices{display:none;flex-direction:column;gap:8px;}
+#edit-choices button{margin-top:0;}
+
+body.readonly-export .note{cursor:default;}
+</style>
+</head>
+
+<body>
+
+<header id="toolbar">
+<label for="userName">Seu nome</label>
+<input type="text" id="userName" placeholder="Ex.: Maria Silva" autocomplete="name">
+
+<div class="palette">
+<span>Destaque</span>
+<button type="button" class="swatch active" data-color="#f2e6a2" title="Amarelo" style="background:#f2e6a2" aria-label="Amarelo"></button>
+<button type="button" class="swatch" data-color="#a8e6cf" title="Verde" style="background:#a8e6cf" aria-label="Verde"></button>
+<button type="button" class="swatch" data-color="#ffaaa5" title="Rosa" style="background:#ffaaa5" aria-label="Rosa"></button>
+<button type="button" class="swatch" data-color="#a8c8ff" title="Azul" style="background:#a8c8ff" aria-label="Azul"></button>
+<button type="button" class="swatch" data-color="#e6b3ff" title="Lilás" style="background:#e6b3ff" aria-label="Lilás"></button>
+<button type="button" class="swatch" data-color="#ffd3a8" title="Laranja" style="background:#ffd3a8" aria-label="Laranja"></button>
+</div>
+
+<div class="toolbar-actions">
+<button type="button" id="exportFinal" class="primary">Exportar versão final</button>
+<button type="button" id="exportProject">Salvar projeto para continuar depois</button>
+</div>
+</header>
+
+<svg id="svg"></svg>
+
+<div id="wrap">
+
+<div class="side"></div>
+
+<div id="center">
+
+<div id="text">
+
+<h2>Vamos Comprar um Poeta - Afonso Cruz</h2>
+
+<!-- COLE O TEXTO AQUI -->
+
+<h3>Trinta gramas de espinafre</h3>
+
+<p>Hoje comi trinta gramas de espinafres, o quilo custa dois euros e trinta, é fazer as contas, precisamos de trinta cêntimos por dia para ter alguma vitamina k, diz um estudo. O pai exerceu vinte gramas de força na porta da cozinha e disse muito alto, antes de nos deixar na cara um ou dois miligramas de saliva, ou beijos, se quiserem ser poéticos: crescimento e prosperidade.</p>
+<p>Eu respondi na mesma moeda.</p> 
+<p>Dizem que é bom transacionarmos afetos, liga as pessoas e gera uma espécie de lucro que, não sendo um lucro de qualidade, já que não é material e não é redutível a números ou dedutível nos impostos ou gerador de renda, há quem acredite — é uma questão de fé —, que pode trazer dividendos.</p> 
+<p>O pai diz que são fantasmas, são coisas que não existem, matéria imaterial, mas há estudos que confirmam a hipótese de haver benefício em depositar
+uns mililitros de saliva na maçã do rosto de outra pessoa, por mais estranho e grotesco que isso nos possa parecer.</p>
+<p>Maçã do rosto é uma expressão esquisita e incompreensível, já que está mais do que provado que não existem maçãs no rosto, é mais do que evidente que nascem nos hipermercados ou pelo menos é lá que são recolhidas para a manutenção da saúde e da mais básica nutrição.</p>
+
+<h3>Exponencialmente parvo</h3>
+
+<p>O meu irmão é exponencialmente parvo. Calça quarenta e quatro e tem
+borbulhas, trinta a quarenta em cada bochecha (muito mais lógico do que
+maçã do rosto), sem contar com a testa e o queixo e o nariz. Usa óculos. As
+sobrancelhas quase não existem devido ao défice de pelos, e quando fala diz
+coisas como “apreça-te” ou “não me arrombes a carteira” (que quer dizer
+que o estou a aborrecer) ou “aumenta-me a taxa de juro” (que diz tanto para
+quando não está a perceber o que lhe digo — acontece vezes sem conta —
+como para quando quer ser mais atrevido com uma rapariga). Apaixona-se
+com facilidade e entra, por causa disso, numa quase constante bancarrota
+emocional. Mais de noventa por cento dos colegas e setenta e quatro por
+cento da família concordam no resultado: é um pateta.</p>
+
+<p>Ao chegar a casa, cumprimentei-o com a normal fórmula de cortesia:
+crescimento e prosperidade. Ele respondeu exercendo um gesto obsceno
+com o dedo médio da mão direita e investindo a língua para fora enquanto
+abria a boca. Vestia uma t-shirt patrocinada por uma gasolineira.</p>
+
+<p>Sentou-se na cozinha a comer biscoitos de gengibre, sete, enquanto
+demonstrava, usando palavras e gestos, o calor sentimental que o
+perturbava.</p>
+
+<p>— Estou apaixonado, disse.</p>
+<p>— Quanto?, perguntei.</p>
+<p>— Setenta por cento.</p>
+<p>— Uau!</p>
+<p>— Desta vez é a sério.</p>
+<p>— Setenta por cento?</p>
+
+<p>— Talvez mais, setenta e dois ou mesmo setenta e três. Ainda não fiz um
+estudo.</p>
+
+<p>— Com a X89234 também te afeiçoaste nessa percentagem.</p>
+<p>— Sim, mas estava a passar um período de grande fragilidade interior.</p>
+<p>— Estavas com fome?</p>
+<p>— Não me arrombes a carteira.</p>
+
+<p>Encolhi os ombros:</p>
+<p>— Tens a certeza de que desta vez é que é?</p>
+<p>— Como dois e dois serem quatro.</p>
+<p>— Setenta e três por cento, dizes tu?</p>
+<p>— Sim. Nunca menos de setenta.</p>
+<p>— Parece-me sólido. E ela?</p>
+<p>— Hoje, quando me disse para ir esfregar moedas, pareceu-me que estava
+realmente disposta a associar-se a mim, mas quando me aproximei e ela
+começou a gritar, percebi que talvez não esteja apaixonada por mim mais do
+que trinta, trinta e seis por cento.</p>
+<p>— Mas poderá crescer?</p>
+<p>— Com toda a certeza.</p>
+
+
+<h3>De que tamanho?</h3>
+
+<p>Achei muito estranho que acedessem à minha petição — à petição que irei
+relatar de seguida —, sem qualquer inquérito por escrito. Não tenho
+números suficientes para descrever como me senti feliz com a decisão.
+Nesse dia, à noite, ao jantar, levantei-me e declarei: Gostava de ter um
+poeta. Podemos comprar um?</p>
+
+<p>A mãe não disse nada, limitou-se a levantar a louça, quatro pratos de sopa,
+quatro colheres de sopa e informar os comensais, eu e o pai e o meu irmão,
+de que a carne seria servida de seguida, dentro de trinta segundos. O pai
+acabou de mastigar um bocado de pão, cerca de treze gramas, moveu os
+maxilares cinco vezes e inquiriu: Porque não um artista?</p>
+
+<p>A mãe disse:</p>
+<p>— Nem pensar, fazem muita porcaria, a senhora 5638,2 tem um e despende
+três a quatro horas por dia a limpar a sujidade que ele faz com as tintas
+naqueles objetos brancos.</p>
+
+<p>— Telas.</p>
+<p>— Isso.</p>
+<p>— Muito bem, disse o pai, compramos um poeta. De que tamanho?</p>
+
+
+
+<h3>A escolha de um poeta</h3>
+
+<p>No dia da escolha, fomos a uma loja, eu e o pai. O pai não é alto, e eu
+tampouco, aliás, é por isso que na escola me chamam ordenado mínimo,
+que é algo que já existiu em tempos, mas que felizmente foi extinto, porque,
+dizem, era um entrave à competitividade mais elementar.</p>
+
+<p>Na loja havia poetas de muitos tipos, baixos, altos, louros, com óculos (são
+mais caros), sendo a maior parte, sessenta e dois por cento, carecas, e
+sessenta e oito por cento de barba.</p>
+
+<p>Gostei de um que era ligeiramente marreco, uma escoliose com uma
+curvatura oblonga.</p>
+
+<p>Trajava um colete de fazenda, setenta e cinco por cento lã, sendo os
+restantes vinte e cinco nylon, calças de bombazina castanhas, pantone
+setecentos e trinta e dois, sapatos de couro já muito usados. Fungava e tinha
+um livro debaixo do braço. Nenhuma das suas roupas tinha patrocínio de
+marcas.</p>
+
+<p>O pai cumprimentou o vendedor com a cortesia destas ocasiões, há sempre
+uma grande solenidade, sacralidade, no ato de iniciar um possível negócio:</p>
+
+<p>— Que os números lhe sejam favoráveis, disse ele.</p>
+<p>— Crescimento e prosperidade, respondeu o vendedor.</p>
+
+<p>O pai apontou para o poeta que fungava e não tinha patrocínio nas roupas e
+perguntou se aquele exemplar era subversivo, que é a característica mais
+temida nos poetas, é o equivalente à agressividade dos cães.</p>
+
+<p>O senhor da loja respondeu:</p>
+
+<p>— Está abaixo dos dois por cento. É sempre necessário serem um pouco
+subversivos ou a qualidade poética baixa demasiado e não gera lucro,
+ninguém compra, acabam preteridos a bailarinos ou hamsters.</p>
+
+<p>— O que é que ele come?</p>
+
+<p>— Qualquer coisa. Não são muito esquisitos, muitas vezes, três a quatro
+ocorrências por semana, chegam inclusivamente a esquecer-se de comer.
+Alguns abandonam a refeição a meio e levantam-se para deambular sem
+qualquer destino. Acontece muito ao pôr do sol ou ao luar ou com nevoeiro,
+é um comportamento típico. Não estranhem se os virem parados muito
+tempo como se estivessem a fazer contas. Não estão, são incapazes da soma
+mais elementar. Essas paragens são precisamente os momentos em que
+começam a fazer poemas nas suas cabeças. É um processo fascinante. Não
+se irão arrepender de comprar um poeta. E são muito mais asseados do que
+os artistas.</p>
+
+<p>— Já tinha ouvido dizer.</p>
+
+<p>— Mais alguma coisa que devamos saber sobre a manutenção de um destes
+exemplares?, inquiri eu.</p>
+
+<p>— Para o entreter, compre-lhe cadernos com folhas brancas e canetas. Pode
+também adquirir alguns livros. Temos de várias marcas.</p>
+
+<!-- FIM DO TEXTO -->
+
+</div>
+
+</div>
+
+<div class="side"></div>
+
+</div>
+
+
+<div id="modal">
+<div id="box">
+<h3 id="modal-title">Nova anotação</h3>
+<textarea id="input" placeholder="Digite sua anotação…"></textarea>
+<div id="create-actions" class="modal-actions">
+<button type="button" id="ok" class="primary">Salvar</button>
+<button type="button" id="cancelCreate">Cancelar</button>
+</div>
+<div id="edit-choices" class="modal-actions">
+<button type="button" id="btnAlterar">Alterar texto</button>
+<button type="button" id="btnExcluir" class="danger">Excluir anotação</button>
+<button type="button" id="cancelEdit">Cancelar</button>
+</div>
+<div id="edit-form" class="modal-actions" style="display:none">
+<button type="button" id="okEdit" class="primary">Salvar alteração</button>
+<button type="button" id="cancelEditForm">Voltar</button>
+</div>
+</div>
+</div>
+
+
+<script>
+/* Estado global */
+let range = null;
+let notes = [];
+let counter = 0;
+let highlightColor = "#f2e6a2";
+let modalMode = "create";
+let editingNoteId = null;
+
+let dragging = null;
+let offsetX = 0;
+let offsetY = 0;
+
+const modal = document.getElementById("modal");
+const input = document.getElementById("input");
+const svg = document.getElementById("svg");
+const modalTitle = document.getElementById("modal-title");
+const createActions = document.getElementById("create-actions");
+const editChoices = document.getElementById("edit-choices");
+const editForm = document.getElementById("edit-form");
+
+const PALETTE = ["#f2e6a2", "#a8e6cf", "#ffaaa5", "#a8c8ff", "#e6b3ff", "#ffd3a8"];
+
+function slugNome() {
+  const nome = document.getElementById("userName").value.trim() || "leitura";
+  return nome
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\w\s-]/gi, "")
+    .replace(/\s+/g, "_")
+    .replace(/_+/g, "_")
+    .slice(0, 80) || "leitura";
+}
+
+function baixarHtml(nomeArquivo, html) {
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = nomeArquivo;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function fecharModal() {
+  modal.style.display = "none";
+  modalMode = "create";
+  editingNoteId = null;
+  input.value = "";
+  createActions.style.display = "flex";
+  editChoices.style.display = "none";
+  editForm.style.display = "none";
+  window.getSelection().removeAllRanges();
+}
+
+function abrirModalCriar() {
+  modalMode = "create";
+  editingNoteId = null;
+  modalTitle.textContent = "Nova anotação";
+  input.value = "";
+  input.style.display = "block";
+  createActions.style.display = "flex";
+  editChoices.style.display = "none";
+  editForm.style.display = "none";
+  modal.style.display = "flex";
+}
+
+function abrirModalEditar(id) {
+  const meta = notes.find((n) => n.id === id);
+  if (!meta) return;
+  modalMode = "edit";
+  editingNoteId = id;
+  modalTitle.textContent = "Anotação";
+  input.value = meta.text;
+  input.style.display = "none";
+  createActions.style.display = "none";
+  editChoices.style.display = "flex";
+  editForm.style.display = "none";
+  modal.style.display = "flex";
+}
+
+function abrirFormAlterar() {
+  input.style.display = "block";
+  editChoices.style.display = "none";
+  editForm.style.display = "flex";
+  modalTitle.textContent = "Alterar texto";
+}
+
+function criarBotaoEditar(noteEl) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "note-edit";
+  btn.title = "Editar anotação";
+  btn.textContent = "✎";
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    abrirModalEditar(noteEl.id);
+  });
+  noteEl.insertBefore(btn, noteEl.firstChild);
+}
+
+function criarNotaElemento(id, texto) {
+  const note = document.createElement("div");
+  note.className = "note";
+  note.id = id;
+  const body = document.createElement("div");
+  body.className = "note-body";
+  body.textContent = texto;
+  note.appendChild(body);
+  criarBotaoEditar(note);
+  return note;
+}
+
+const NOTE_GAP = 10;
+const NOTE_LANE_LEFT = 20;
+const NOTE_LANE_RIGHT = 20;
+
+function posicionarNota(note, span, lado) {
+  const rect = span.getBoundingClientRect();
+  const scrollTop = window.scrollY;
+
+  if (!note.isConnected) document.body.appendChild(note);
+
+  let top = scrollTop + rect.top + rect.height / 2 - note.offsetHeight / 2;
+
+  const others = notes
+    .filter((n) => n.lado === lado)
+    .map((n) => document.getElementById(n.id))
+    .filter((el) => el && el !== note);
+
+  others.sort((a, b) => (parseFloat(a.style.top) || 0) - (parseFloat(b.style.top) || 0));
+
+  for (const other of others) {
+    const ot = parseFloat(other.style.top) || 0;
+    const ob = ot + other.offsetHeight;
+    if (top < ob + NOTE_GAP && top + note.offsetHeight > ot - NOTE_GAP) {
+      top = ob + NOTE_GAP;
+    }
+  }
+
+  const minTop = scrollTop + rect.top - 4;
+  const maxTop = scrollTop + rect.bottom - note.offsetHeight + 4;
+  if (maxTop >= minTop) {
+    top = Math.min(Math.max(top, minTop), maxTop);
+  }
+
+  note.style.top = top + "px";
+  if (lado) {
+    note.style.left = NOTE_LANE_LEFT + "px";
+    note.style.right = "auto";
+  } else {
+    note.style.right = NOTE_LANE_RIGHT + "px";
+    note.style.left = "auto";
+  }
+}
+
+function aplicarPosicaoSalva(note, dados) {
+  if (dados.top) note.style.top = dados.top;
+  if (dados.left && dados.left !== "auto") {
+    note.style.left = dados.left;
+    note.style.right = "auto";
+  } else if (dados.right && dados.right !== "auto") {
+    note.style.right = dados.right;
+    note.style.left = "auto";
+  }
+}
+
+function ativarDrag(el) {
+  if (el.dataset.interactive === "1") return;
+  el.dataset.interactive = "1";
+  el.addEventListener("mousedown", (e) => {
+    if (e.target.closest(".note-edit")) return;
+    dragging = el;
+    const rect = el.getBoundingClientRect();
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
+    el.style.cursor = "grabbing";
+  });
+}
+
+function limparNotasDuplicadas() {
+  const vistos = new Set();
+  document.querySelectorAll(".note").forEach((el) => {
+    if (!el.id || vistos.has(el.id)) {
+      el.remove();
+      return;
+    }
+    vistos.add(el.id);
+  });
+}
+
+function limparTodasNotas() {
+  document.querySelectorAll(".note").forEach((el) => el.remove());
+}
+
+function sincronizarNotaDoDOM(noteEl, meta) {
+  const body = noteEl.querySelector(".note-body");
+  if (body) body.textContent = meta.text;
+  if (!noteEl.querySelector(".note-edit")) criarBotaoEditar(noteEl);
+}
+
+function salvarPosicaoNota(el) {
+  const meta = notes.find((n) => n.id === el.id);
+  if (!meta) return;
+  meta.top = el.style.top;
+  meta.left = el.style.left;
+  meta.right = el.style.right;
+}
+
+function excluirNota(id) {
+  const noteEl = document.getElementById(id);
+  const span = document.querySelector(`[data-id="${id}"]`);
+  if (noteEl) noteEl.remove();
+  if (span) {
+    const parent = span.parentNode;
+    while (span.firstChild) {
+      parent.insertBefore(span.firstChild, span);
+    }
+    parent.removeChild(span);
+    parent.normalize();
+  }
+  notes = notes.filter((n) => n.id !== id);
+  desenhar();
+}
+
+function atualizarTextoNota(id, novoTexto) {
+  const meta = notes.find((n) => n.id === id);
+  const noteEl = document.getElementById(id);
+  if (meta) meta.text = novoTexto;
+  if (noteEl) {
+    const body = noteEl.querySelector(".note-body");
+    if (body) body.textContent = novoTexto;
+  }
+}
+
+function adicionarNota(valor) {
+  const id = "n" + counter++;
+  const span = document.createElement("span");
+  span.className = "highlight";
+  span.dataset.id = id;
+  span.style.background = highlightColor;
+
+  try {
+    range.surroundContents(span);
+  } catch (err) {
+    alert("Não foi possível destacar essa seleção. Tente selecionar apenas dentro de um parágrafo, sem cruzar tags.");
+    return;
+  }
+
+  const note = criarNotaElemento(id, valor);
+  const rect = span.getBoundingClientRect();
+  const center = document.getElementById("text").getBoundingClientRect();
+  const lado = rect.left + rect.width / 2 < center.left + center.width / 2;
+
+  document.body.appendChild(note);
+  posicionarNota(note, span, lado);
+  ativarDrag(note);
+
+  notes.push({
+    id,
+    lado,
+    text: valor,
+    color: highlightColor,
+    top: note.style.top,
+    left: note.style.left,
+    right: note.style.right,
+  });
+
+  desenhar();
+  fecharModal();
+}
+
+function restaurarNota(meta) {
+  const span = document.querySelector(`[data-id="${meta.id}"]`);
+  if (span && meta.color) {
+    span.style.background = meta.color;
+    span.classList.add("highlight");
+  }
+
+  let noteEl = document.getElementById(meta.id);
+  if (!noteEl) {
+    noteEl = criarNotaElemento(meta.id, meta.text);
+    document.body.appendChild(noteEl);
+  } else {
+    sincronizarNotaDoDOM(noteEl, meta);
+  }
+
+  if (meta.top || meta.left || meta.right) {
+    aplicarPosicaoSalva(noteEl, meta);
+  } else if (span) {
+    posicionarNota(noteEl, span, meta.lado);
+  }
+
+  ativarDrag(noteEl);
+  notes.push({ ...meta });
+}
+
+function coletarEstado() {
+  notes.forEach((n) => {
+    const el = document.getElementById(n.id);
+    if (el) salvarPosicaoNota(el);
+  });
+  return {
+    version: 1,
+    userName: document.getElementById("userName").value.trim(),
+    highlightColor,
+    counter,
+    textHtml: document.getElementById("text").innerHTML,
+    notes: notes.map((n) => ({ ...n })),
+  };
+}
+
+function restaurarEstado(state) {
+  if (!state || state.version !== 1) return;
+  limparTodasNotas();
+  notes = [];
+
+  if (state.userName) {
+    document.getElementById("userName").value = state.userName;
+  }
+  if (state.highlightColor) {
+    highlightColor = state.highlightColor;
+    document.querySelectorAll(".swatch").forEach((s) => {
+      s.classList.toggle("active", s.dataset.color === highlightColor);
+    });
+  }
+  if (state.textHtml) {
+    document.getElementById("text").innerHTML = state.textHtml;
+  }
+  counter = state.counter || 0;
+
+  limparNotasDuplicadas();
+  (state.notes || []).forEach((meta) => restaurarNota(meta));
+  limparNotasDuplicadas();
+  desenhar();
+}
+
+/* Paleta */
+document.querySelectorAll(".swatch").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    highlightColor = btn.dataset.color;
+    document.querySelectorAll(".swatch").forEach((s) => s.classList.remove("active"));
+    btn.classList.add("active");
+  });
+});
+
+/* Seleção → nova anotação */
+document.addEventListener("mouseup", () => {
+  if (dragging) return;
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || !sel.toString().trim()) return;
+  const anchor = sel.anchorNode;
+  const textEl = document.getElementById("text");
+  if (!anchor || !textEl.contains(anchor)) return;
+  range = sel.getRangeAt(0).cloneRange();
+  abrirModalCriar();
+});
+
+document.getElementById("ok").onclick = () => {
+  const valor = input.value.trim();
+  if (!valor) return;
+  adicionarNota(valor);
+};
+
+document.getElementById("cancelCreate").onclick = fecharModal;
+document.getElementById("cancelEdit").onclick = fecharModal;
+
+document.getElementById("btnAlterar").onclick = abrirFormAlterar;
+
+document.getElementById("btnExcluir").onclick = () => {
+  if (!editingNoteId) return;
+  if (confirm("Excluir esta anotação e o destaque no texto?")) {
+    excluirNota(editingNoteId);
+    fecharModal();
+  }
+};
+
+document.getElementById("okEdit").onclick = () => {
+  const valor = input.value.trim();
+  if (!valor || !editingNoteId) return;
+  atualizarTextoNota(editingNoteId, valor);
+  fecharModal();
+};
+
+document.getElementById("cancelEditForm").onclick = () => {
+  const meta = notes.find((n) => n.id === editingNoteId);
+  if (meta) input.value = meta.text;
+  input.style.display = "none";
+  editForm.style.display = "none";
+  editChoices.style.display = "flex";
+  modalTitle.textContent = "Anotação";
+};
+
+/* Drag global */
+document.addEventListener("mousemove", (e) => {
+  if (!dragging) return;
+  dragging.style.left = e.pageX - offsetX + "px";
+  dragging.style.top = e.pageY - offsetY + "px";
+  dragging.style.right = "auto";
+  desenhar();
+});
+
+document.addEventListener("mouseup", () => {
+  if (dragging) {
+    dragging.style.cursor = "grab";
+    salvarPosicaoNota(dragging);
+    dragging = null;
+  }
+});
+
+function resizeSVG() {
+  svg.setAttribute("height", document.documentElement.scrollHeight);
+}
+
+window.addEventListener("scroll", desenhar);
+window.addEventListener("resize", desenhar);
+
+function pontosConexao(span, note) {
+  const r1 = span.getBoundingClientRect();
+  const r2 = note.getBoundingClientRect();
+  const scrollTop = window.scrollY;
+  const textEl = document.getElementById("text");
+  const textMid = textEl
+    ? textEl.getBoundingClientRect().left + textEl.getBoundingClientRect().width / 2
+    : window.innerWidth / 2;
+  const highlightMid = r1.left + r1.width / 2;
+  const notaNaEsquerda = r2.left + r2.width / 2 < textMid;
+
+  const x1 = highlightMid < textMid ? r1.left : r1.right;
+  const y1 = scrollTop + r1.top + r1.height / 2;
+  const x2 = notaNaEsquerda ? r2.right : r2.left;
+  const y2 = scrollTop + r2.top + r2.height / 2;
+  const mid = (y1 + y2) / 2 - 40;
+
+  return { x1, y1, x2, y2, mid };
+}
+
+function desenhar() {
+  resizeSVG();
+  svg.innerHTML = "";
+  notes.forEach((n) => {
+    const note = document.getElementById(n.id);
+    const span = document.querySelector(`[data-id="${n.id}"]`);
+    if (!note || !span) return;
+
+    const { x1, y1, x2, y2, mid } = pontosConexao(span, note);
+
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute(
+      "d",
+      `M ${x1} ${y1} C ${x1 + (x2 > x1 ? 60 : -60)} ${mid}, ${x2 + (x2 > x1 ? -60 : 60)} ${mid}, ${x2} ${y2}`
+    );
+    path.setAttribute("stroke", "#333");
+    path.setAttribute("stroke-width", "1.2");
+    path.setAttribute("fill", "none");
+    svg.appendChild(path);
+  });
+}
+
+let backupLayoutExport = null;
+
+function prepararLayoutExportacao() {
+  notes.forEach((n) => {
+    const el = document.getElementById(n.id);
+    if (el) salvarPosicaoNota(el);
+  });
+
+  backupLayoutExport = notes.map((n) => {
+    const el = document.getElementById(n.id);
+    return {
+      id: n.id,
+      top: el?.style.top || "",
+      left: el?.style.left || "",
+      right: el?.style.right || "",
+    };
+  });
+
+  const toolbar = document.getElementById("toolbar");
+  const toolbarH = toolbar ? toolbar.offsetHeight : 0;
+
+  if (toolbar) toolbar.style.display = "none";
+
+  /* Mantém onde o usuário colocou; só compensa a página “subir” sem o cabeçalho */
+  if (toolbarH > 0) {
+    notes.forEach((n) => {
+      const note = document.getElementById(n.id);
+      if (!note?.style.top) return;
+      const top = parseFloat(note.style.top);
+      if (!Number.isNaN(top)) note.style.top = top - toolbarH + "px";
+    });
+  }
+
+  desenhar();
+}
+
+function restaurarLayoutEdicao() {
+  const toolbar = document.getElementById("toolbar");
+  if (toolbar) toolbar.style.display = "";
+
+  if (backupLayoutExport) {
+    backupLayoutExport.forEach((b) => {
+      const note = document.getElementById(b.id);
+      if (note) aplicarPosicaoSalva(note, b);
+    });
+    backupLayoutExport = null;
+  }
+
+  desenhar();
+}
+
+function htmlVersaoFinal() {
+  limparNotasDuplicadas();
+  prepararLayoutExportacao();
+
+  const clone = document.documentElement.cloneNode(true);
+  const idsExport = new Set();
+  clone.querySelectorAll(".note").forEach((el) => {
+    if (!el.id || idsExport.has(el.id)) el.remove();
+    else idsExport.add(el.id);
+  });
+  clone.querySelector("#toolbar")?.remove();
+  clone.querySelector("#modal")?.remove();
+  clone.querySelectorAll("script").forEach((s) => s.remove());
+  clone.querySelectorAll(".note-edit").forEach((b) => b.remove());
+
+  const style = clone.querySelector("style");
+  if (style) {
+    style.textContent +=
+      "\n.note{cursor:default!important;}\n#text{user-select:text;}\n#toolbar{display:none!important;}\n";
+  }
+  clone.querySelector("body")?.classList.add("readonly-export");
+
+  const titulo = document.getElementById("userName").value.trim();
+  const titleEl = clone.querySelector("title");
+  if (titleEl && titulo) {
+    titleEl.textContent = titulo + " — Leitura anotada";
+  }
+
+  const html = "<!DOCTYPE html>\n" + clone.outerHTML;
+
+  restaurarLayoutEdicao();
+
+  return html;
+}
+
+function htmlProjeto(state) {
+  const stateJson = JSON.stringify(state)
+    .replace(/</g, "\\u003c")
+    .replace(/-->/g, "--\\u003e");
+
+  const doc = document.documentElement.cloneNode(true);
+
+  doc.querySelectorAll(".note").forEach((el) => el.remove());
+  const svgClone = doc.querySelector("#svg");
+  if (svgClone) svgClone.innerHTML = "";
+
+  const scripts = doc.querySelectorAll("script");
+  const appScript = scripts[scripts.length - 1];
+  if (!appScript) return htmlVersaoFinal();
+
+  const boot = document.createElement("script");
+  boot.textContent = "const INITIAL_STATE = " + stateJson + ";\n";
+  appScript.parentNode.insertBefore(boot, appScript);
+
+  return "<!DOCTYPE html>\n" + doc.outerHTML;
+}
+
+document.getElementById("exportFinal").onclick = () => {
+  const nome = slugNome() + "_versao_final.html";
+  baixarHtml(nome, htmlVersaoFinal());
+};
+
+document.getElementById("exportProject").onclick = () => {
+  const state = coletarEstado();
+  const nome = slugNome() + "_projeto.html";
+  baixarHtml(nome, htmlProjeto(state));
+};
+
+/* Inicialização (projeto reaberto — após todo o HTML, inclusive boxes salvos por engano) */
+function iniciarApp() {
+  limparNotasDuplicadas();
+  if (typeof INITIAL_STATE !== "undefined" && INITIAL_STATE) {
+    restaurarEstado(INITIAL_STATE);
+  } else {
+    desenhar();
+  }
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", iniciarApp);
+} else {
+  iniciarApp();
+}
+</script>
+
+</body>
+</html>
