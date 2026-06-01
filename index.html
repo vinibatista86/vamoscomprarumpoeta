@@ -106,6 +106,21 @@ padding:60px;
 line-height:1.9;
 font-size:18px;
 box-shadow:0 10px 30px rgba(0,0,0,.08);
+box-sizing:border-box;
+}
+
+body.readonly-export #text{
+width:740px!important;
+max-width:740px!important;
+min-width:740px!important;
+}
+
+body.readonly-export #wrap{
+min-width:1260px;
+}
+
+body.readonly-export .side{
+flex-shrink:0;
 }
 
 #text p{
@@ -550,36 +565,11 @@ const NOTE_GAP = 10;
 const NOTE_LANE_LEFT = 20;
 const NOTE_LANE_RIGHT = 20;
 
-function posicionarNota(note, span, lado) {
-  const rect = span.getBoundingClientRect();
-  const scrollTop = window.scrollY;
+function definirLadoNota(note, lado) {
+  note.dataset.lado = lado ? "left" : "right";
+}
 
-  if (!note.isConnected) document.body.appendChild(note);
-
-  let top = scrollTop + rect.top + rect.height / 2 - note.offsetHeight / 2;
-
-  const others = notes
-    .filter((n) => n.lado === lado)
-    .map((n) => document.getElementById(n.id))
-    .filter((el) => el && el !== note);
-
-  others.sort((a, b) => (parseFloat(a.style.top) || 0) - (parseFloat(b.style.top) || 0));
-
-  for (const other of others) {
-    const ot = parseFloat(other.style.top) || 0;
-    const ob = ot + other.offsetHeight;
-    if (top < ob + NOTE_GAP && top + note.offsetHeight > ot - NOTE_GAP) {
-      top = ob + NOTE_GAP;
-    }
-  }
-
-  const minTop = scrollTop + rect.top - 4;
-  const maxTop = scrollTop + rect.bottom - note.offsetHeight + 4;
-  if (maxTop >= minTop) {
-    top = Math.min(Math.max(top, minTop), maxTop);
-  }
-
-  note.style.top = top + "px";
+function aplicarFaixaNota(note, lado) {
   if (lado) {
     note.style.left = NOTE_LANE_LEFT + "px";
     note.style.right = "auto";
@@ -589,15 +579,135 @@ function posicionarNota(note, span, lado) {
   }
 }
 
-function aplicarPosicaoSalva(note, dados) {
-  if (dados.top) note.style.top = dados.top;
-  if (dados.left && dados.left !== "auto") {
-    note.style.left = dados.left;
-    note.style.right = "auto";
-  } else if (dados.right && dados.right !== "auto") {
-    note.style.right = dados.right;
-    note.style.left = "auto";
+function centroSpanPage(span) {
+  const r = span.getBoundingClientRect();
+  return {
+    x: r.left + r.width / 2,
+    y: window.scrollY + r.top + r.height / 2,
+  };
+}
+
+function centroNotaPage(note) {
+  const r = note.getBoundingClientRect();
+  return {
+    x: r.left + r.width / 2,
+    y: window.scrollY + r.top + r.height / 2,
+  };
+}
+
+function salvarOffsetRelativo(note, span) {
+  if (!span) span = document.querySelector(`[data-id="${note.id}"]`);
+  if (!span) return;
+  const cS = centroSpanPage(span);
+  const cN = centroNotaPage(note);
+  const dx = cN.x - cS.x;
+  const dy = cN.y - cS.y;
+  note.dataset.dx = String(dx);
+  note.dataset.dy = String(dy);
+  const meta = notes.find((n) => n.id === note.id);
+  if (meta) {
+    meta.dx = dx;
+    meta.dy = dy;
+    delete meta.top;
+    delete meta.left;
+    delete meta.right;
   }
+}
+
+function aplicarNotaPorOffset(note, span) {
+  if (!span) span = document.querySelector(`[data-id="${note.id}"]`);
+  if (!span) return false;
+  const meta = notes.find((n) => n.id === note.id);
+  let dx = parseFloat(note.dataset.dx);
+  let dy = parseFloat(note.dataset.dy);
+  if (Number.isNaN(dx) && meta?.dx != null) {
+    dx = meta.dx;
+    dy = meta.dy ?? 0;
+    note.dataset.dx = String(dx);
+    note.dataset.dy = String(dy);
+  }
+  if (Number.isNaN(dx)) return false;
+  if (Number.isNaN(dy)) dy = 0;
+  const cS = centroSpanPage(span);
+  const w = note.offsetWidth;
+  const h = note.offsetHeight;
+  note.style.left = cS.x + dx - w / 2 + "px";
+  note.style.top = cS.y + dy - h / 2 + "px";
+  note.style.right = "auto";
+  return true;
+}
+
+function sincronizarTodasNotasPorOffset() {
+  notes.forEach((n) => {
+    const note = document.getElementById(n.id);
+    const span = document.querySelector(`[data-id="${n.id}"]`);
+    if (!note || !span) return;
+    if (note.dataset.dx != null || n.dx != null) {
+      aplicarNotaPorOffset(note, span);
+    }
+  });
+  desenhar();
+}
+
+function calcularTopAutomatico(note, span, lado, faixasOcupadas) {
+  const scrollTop = window.scrollY;
+  if (!note.isConnected) document.body.appendChild(note);
+  aplicarFaixaNota(note, lado);
+
+  let top = scrollTop + span.getBoundingClientRect().top + span.getBoundingClientRect().height / 2 - note.offsetHeight / 2;
+  const lane = lado ? faixasOcupadas.left : faixasOcupadas.right;
+
+  lane.sort((a, b) => a - b);
+  for (const ot of lane) {
+    const noteH = note.offsetHeight;
+    if (top < ot + noteH + NOTE_GAP && top + noteH > ot - NOTE_GAP) {
+      top = ot + noteH + NOTE_GAP;
+    }
+  }
+
+  const minTop = scrollTop + span.getBoundingClientRect().top - 4;
+  const maxTop = scrollTop + span.getBoundingClientRect().bottom - note.offsetHeight + 4;
+  if (maxTop >= minTop) {
+    top = Math.min(Math.max(top, minTop), maxTop);
+  }
+
+  lane.push(top);
+  return top;
+}
+
+function posicionarNota(note, span, lado) {
+  if (!note.isConnected) document.body.appendChild(note);
+  definirLadoNota(note, lado);
+  const faixas = { left: [], right: [] };
+  notes.forEach((n) => {
+    if (n.id === note.id) return;
+    const el = document.getElementById(n.id);
+    if (!el || !el.style.top) return;
+    const t = parseFloat(el.style.top);
+    if (!Number.isNaN(t)) {
+      (n.lado ? faixas.left : faixas.right).push(t);
+    }
+  });
+  const top = calcularTopAutomatico(note, span, lado, faixas);
+  note.style.top = top + "px";
+  aplicarFaixaNota(note, lado);
+  salvarOffsetRelativo(note, span);
+}
+
+function aplicarPosicaoSalva(note, dados) {
+  const meta = notes.find((n) => n.id === note.id);
+  const span = document.querySelector(`[data-id="${note.id}"]`);
+  if (meta) definirLadoNota(note, meta.lado);
+  if (dados.dx != null && dados.dy != null) {
+    note.dataset.dx = String(dados.dx);
+    note.dataset.dy = String(dados.dy);
+    if (span) aplicarNotaPorOffset(note, span);
+    return;
+  }
+  if (dados.top) note.style.top = dados.top;
+  if (dados.left) note.style.left = dados.left;
+  if (dados.right) note.style.right = dados.right;
+  if (span) salvarOffsetRelativo(note, span);
 }
 
 function ativarDrag(el) {
@@ -635,11 +745,13 @@ function sincronizarNotaDoDOM(noteEl, meta) {
 }
 
 function salvarPosicaoNota(el) {
+  const span = document.querySelector(`[data-id="${el.id}"]`);
+  if (span) salvarOffsetRelativo(el, span);
   const meta = notes.find((n) => n.id === el.id);
   if (!meta) return;
-  meta.top = el.style.top;
-  meta.left = el.style.left;
-  meta.right = el.style.right;
+  meta.dx = parseFloat(el.dataset.dx);
+  meta.dy = parseFloat(el.dataset.dy);
+  meta.lado = el.dataset.lado === "left";
 }
 
 function excluirNota(id) {
@@ -687,6 +799,7 @@ function adicionarNota(valor) {
   const center = document.getElementById("text").getBoundingClientRect();
   const lado = rect.left + rect.width / 2 < center.left + center.width / 2;
 
+  definirLadoNota(note, lado);
   document.body.appendChild(note);
   posicionarNota(note, span, lado);
   ativarDrag(note);
@@ -696,9 +809,8 @@ function adicionarNota(valor) {
     lado,
     text: valor,
     color: highlightColor,
-    top: note.style.top,
-    left: note.style.left,
-    right: note.style.right,
+    dx: parseFloat(note.dataset.dx),
+    dy: parseFloat(note.dataset.dy),
   });
 
   desenhar();
@@ -719,8 +831,13 @@ function restaurarNota(meta) {
   } else {
     sincronizarNotaDoDOM(noteEl, meta);
   }
+  definirLadoNota(noteEl, meta.lado);
 
-  if (meta.top || meta.left || meta.right) {
+  if (meta.dx != null && meta.dy != null) {
+    noteEl.dataset.dx = String(meta.dx);
+    noteEl.dataset.dy = String(meta.dy);
+    if (span) aplicarNotaPorOffset(noteEl, span);
+  } else if (meta.top || meta.left || meta.right) {
     aplicarPosicaoSalva(noteEl, meta);
   } else if (span) {
     posicionarNota(noteEl, span, meta.lado);
@@ -767,7 +884,7 @@ function restaurarEstado(state) {
   limparNotasDuplicadas();
   (state.notes || []).forEach((meta) => restaurarNota(meta));
   limparNotasDuplicadas();
-  desenhar();
+  sincronizarTodasNotasPorOffset();
 }
 
 /* Paleta */
@@ -826,7 +943,7 @@ document.getElementById("cancelEditForm").onclick = () => {
   modalTitle.textContent = "Anotação";
 };
 
-/* Drag global */
+/* Drag global — posição livre; offset salvo em relação ao destaque */
 document.addEventListener("mousemove", (e) => {
   if (!dragging) return;
   dragging.style.left = e.pageX - offsetX + "px";
@@ -838,6 +955,16 @@ document.addEventListener("mousemove", (e) => {
 document.addEventListener("mouseup", () => {
   if (dragging) {
     dragging.style.cursor = "grab";
+    const span = document.querySelector(`[data-id="${dragging.id}"]`);
+    const textEl = document.getElementById("text");
+    if (textEl && span) {
+      const nr = dragging.getBoundingClientRect();
+      const tr = textEl.getBoundingClientRect();
+      const lado = nr.left + nr.width / 2 < tr.left + tr.width / 2;
+      definirLadoNota(dragging, lado);
+      const meta = notes.find((n) => n.id === dragging.id);
+      if (meta) meta.lado = lado;
+    }
     salvarPosicaoNota(dragging);
     dragging = null;
   }
@@ -848,7 +975,22 @@ function resizeSVG() {
 }
 
 window.addEventListener("scroll", desenhar);
-window.addEventListener("resize", desenhar);
+
+let redrawTimer;
+function agendarRedraw() {
+  clearTimeout(redrawTimer);
+  redrawTimer = setTimeout(() => {
+    sincronizarTodasNotasPorOffset();
+  }, 80);
+}
+window.addEventListener("resize", agendarRedraw);
+const textElMonitor = document.getElementById("text");
+if (textElMonitor && window.ResizeObserver) {
+  new ResizeObserver(agendarRedraw).observe(textElMonitor);
+}
+if (window.visualViewport) {
+  visualViewport.addEventListener("resize", agendarRedraw);
+}
 
 function pontosConexao(span, note) {
   const r1 = span.getBoundingClientRect();
@@ -892,76 +1034,92 @@ function desenhar() {
   });
 }
 
-let backupLayoutExport = null;
-
-function prepararLayoutExportacao() {
+function prepararMetadadosExportacao() {
   notes.forEach((n) => {
-    const el = document.getElementById(n.id);
-    if (el) salvarPosicaoNota(el);
+    const note = document.getElementById(n.id);
+    const span = document.querySelector(`[data-id="${n.id}"]`);
+    if (note && span) salvarOffsetRelativo(note, span);
   });
-
-  backupLayoutExport = notes.map((n) => {
-    const el = document.getElementById(n.id);
-    return {
-      id: n.id,
-      top: el?.style.top || "",
-      left: el?.style.left || "",
-      right: el?.style.right || "",
-    };
-  });
-
-  const toolbar = document.getElementById("toolbar");
-  const toolbarH = toolbar ? toolbar.offsetHeight : 0;
-
-  if (toolbar) toolbar.style.display = "none";
-
-  /* Mantém onde o usuário colocou; só compensa a página “subir” sem o cabeçalho */
-  if (toolbarH > 0) {
-    notes.forEach((n) => {
-      const note = document.getElementById(n.id);
-      if (!note?.style.top) return;
-      const top = parseFloat(note.style.top);
-      if (!Number.isNaN(top)) note.style.top = top - toolbarH + "px";
-    });
-  }
-
-  desenhar();
 }
 
-function restaurarLayoutEdicao() {
-  const toolbar = document.getElementById("toolbar");
-  if (toolbar) toolbar.style.display = "";
-
-  if (backupLayoutExport) {
-    backupLayoutExport.forEach((b) => {
-      const note = document.getElementById(b.id);
-      if (note) aplicarPosicaoSalva(note, b);
-    });
-    backupLayoutExport = null;
-  }
-
-  desenhar();
+function scriptVersaoFinalLeitura() {
+  return `(function(){
+function aplicarNota(n,s){
+ var dx=parseFloat(n.dataset.dx||"0"),dy=parseFloat(n.dataset.dy||"0");
+ if(isNaN(dx))dx=0;if(isNaN(dy))dy=0;
+ var r=s.getBoundingClientRect(),st=window.scrollY;
+ var cx=r.left+r.width/2,cy=st+r.top+r.height/2;
+ var w=n.offsetWidth,h=n.offsetHeight;
+ n.style.left=(cx+dx-w/2)+"px";
+ n.style.top=(cy+dy-h/2)+"px";
+ n.style.right="auto";
+}
+function pontos(s,n){
+ var r1=s.getBoundingClientRect(),r2=n.getBoundingClientRect(),st=window.scrollY,te=document.getElementById("text");
+ var tm=te?te.getBoundingClientRect().left+te.getBoundingClientRect().width/2:window.innerWidth/2;
+ var hm=r1.left+r1.width/2,es=r2.left+r2.width/2<tm;
+ return{x1:hm<tm?r1.left:r1.right,y1:st+r1.top+r1.height/2,x2:es?r2.right:r2.left,y2:st+r2.top+r2.height/2,mid:(st+r1.top+r1.height/2+st+r2.top+r2.height/2)/2-40};
+}
+function desenhar(){
+ var svg=document.getElementById("svg");if(!svg)return;
+ svg.setAttribute("height",document.documentElement.scrollHeight);
+ svg.innerHTML="";
+ document.querySelectorAll(".note").forEach(function(n){
+  var s=document.querySelector('[data-id="'+n.id+'"]');if(!s)return;
+  var p=pontos(s,n),path=document.createElementNS("http://www.w3.org/2000/svg","path");
+  path.setAttribute("d","M "+p.x1+" "+p.y1+" C "+(p.x1+(p.x2>p.x1?60:-60))+" "+p.mid+", "+(p.x2+(p.x2>p.x1?-60:60))+" "+p.mid+", "+p.x2+" "+p.y2);
+  path.setAttribute("stroke","#333");path.setAttribute("stroke-width","1.2");path.setAttribute("fill","none");
+  svg.appendChild(path);
+ });
+}
+function sincronizar(){
+ document.querySelectorAll(".note").forEach(function(n){
+  var s=document.querySelector('[data-id="'+n.id+'"]');
+  if(s)aplicarNota(n,s);
+ });
+ desenhar();
+}
+function agendar(){requestAnimationFrame(sincronizar);}
+window.addEventListener("load",agendar);
+window.addEventListener("resize",agendar);
+window.addEventListener("orientationchange",agendar);
+if(window.visualViewport){visualViewport.addEventListener("resize",agendar);visualViewport.addEventListener("scroll",agendar);}
+var te=document.getElementById("text");
+if(te&&window.ResizeObserver)new ResizeObserver(agendar).observe(te);
+})();`;
 }
 
 function htmlVersaoFinal() {
   limparNotasDuplicadas();
-  prepararLayoutExportacao();
+  notes.forEach((n) => {
+    const el = document.getElementById(n.id);
+    if (el) salvarPosicaoNota(el);
+  });
+  prepararMetadadosExportacao();
 
   const clone = document.documentElement.cloneNode(true);
   const idsExport = new Set();
   clone.querySelectorAll(".note").forEach((el) => {
     if (!el.id || idsExport.has(el.id)) el.remove();
-    else idsExport.add(el.id);
+    else {
+      idsExport.add(el.id);
+      el.style.removeProperty("top");
+      el.style.removeProperty("left");
+      el.style.removeProperty("right");
+      el.removeAttribute("data-interactive");
+    }
   });
   clone.querySelector("#toolbar")?.remove();
   clone.querySelector("#modal")?.remove();
   clone.querySelectorAll("script").forEach((s) => s.remove());
   clone.querySelectorAll(".note-edit").forEach((b) => b.remove());
+  const svgClone = clone.querySelector("#svg");
+  if (svgClone) svgClone.innerHTML = "";
 
   const style = clone.querySelector("style");
   if (style) {
     style.textContent +=
-      "\n.note{cursor:default!important;}\n#text{user-select:text;}\n#toolbar{display:none!important;}\n";
+      "\n.note{cursor:default!important;pointer-events:none;}\n#text{user-select:text;}\n";
   }
   clone.querySelector("body")?.classList.add("readonly-export");
 
@@ -971,11 +1129,11 @@ function htmlVersaoFinal() {
     titleEl.textContent = titulo + " — Leitura anotada";
   }
 
-  const html = "<!DOCTYPE html>\n" + clone.outerHTML;
+  const scriptEl = clone.ownerDocument.createElement("script");
+  scriptEl.textContent = scriptVersaoFinalLeitura();
+  clone.querySelector("body")?.appendChild(scriptEl);
 
-  restaurarLayoutEdicao();
-
-  return html;
+  return "<!DOCTYPE html>\n" + clone.outerHTML;
 }
 
 function htmlProjeto(state) {
